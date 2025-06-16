@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Car Game</title>
+  <style>
+    #colab-canvas {
+      border: 10px solid black;
+      background: white;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="colab-canvas" width="1500" height="1300"></canvas>
+
+  <script>
+    (function() {
+      const canvas = document.getElementById('colab-canvas');
+      const ctx = canvas.getContext('2d');
+
+      const config = {
+        circleRadius: 360,
+        ballRadius: 8,
+        carWidth: 40,
+        carHeight: 20,
+        acceleration: 0.6,
+        damping: 1.00,
+        numBalls: 20,
+        keys: {},
+        carFriction: 1.0,
+        maxSpeed: 12
+      };
+
+      const circle = { x: 500, y: 430 };
+      const balls = [];
+      const car = { x: 400, y: 300, vx: 0, vy: 0, angle: 0 };
+
+      function createBalls() {
+        for(let i = 0; i < config.numBalls; i++) {
+          balls.push({
+            x: circle.x + (Math.random() * 2 - 1) * (config.circleRadius - config.ballRadius),
+            y: circle.y + (Math.random() * 2 - 1) * (config.circleRadius - config.ballRadius),
+            vx: (Math.random() - 0.5) * 2,
+            vy: (Math.random() - 0.5) * 2
+          });
+        }
+      }
+
+      document.addEventListener('keydown', (e) => config.keys[e.key] = true);
+      document.addEventListener('keyup', (e) => config.keys[e.key] = false);
+
+      function updatePhysics() {
+        let ax = 0, ay = 0;
+        if (config.keys['d'] || config.keys['ArrowRight']) ax += config.acceleration;
+        if (config.keys['a'] || config.keys['ArrowLeft']) ax -= config.acceleration;
+        if (config.keys['w'] || config.keys['ArrowUp']) ay -= config.acceleration;
+        if (config.keys['s'] || config.keys['ArrowDown']) ay += config.acceleration;
+
+        car.vx += ax;
+        car.vy += ay;
+        car.vx *= config.carFriction;
+        car.vy *= config.carFriction;
+        car.vx = Math.max(-config.maxSpeed, Math.min(config.maxSpeed, car.vx));
+        car.vy = Math.max(-config.maxSpeed, Math.min(config.maxSpeed, car.vy));
+        car.x += car.vx;
+        car.y += car.vy;
+
+        if (car.vx !== 0 || car.vy !== 0) {
+          car.angle = Math.atan2(car.vy, car.vx);
+        }
+
+        const dxCar = car.x - circle.x;
+        const dyCar = car.y - circle.y;
+        const distCar = Math.sqrt(dxCar*dxCar + dyCar*dyCar);
+        const maxCarDist = config.circleRadius - (Math.sqrt(config.carWidth**2 + config.carHeight**2)/2);
+        if (distCar > maxCarDist) {
+          const ratio = maxCarDist / distCar;
+          car.x = circle.x + dxCar * ratio;
+          car.y = circle.y + dyCar * ratio;
+        }
+
+        balls.forEach(ball => {
+          const dx = ball.x - car.x;
+          const dy = ball.y - car.y;
+          const distance = Math.sqrt(dx*dx + dy*dy);
+          const minDist = config.ballRadius + Math.max(config.carWidth, config.carHeight)/2;
+
+          if (distance < minDist) {
+            const nx = dx / distance;
+            const ny = dy / distance;
+            const pushForce = 2;
+
+            ball.vx += nx * pushForce;
+            ball.vy += ny * pushForce;
+            car.vx -= nx * pushForce * 0.1;
+            car.vy -= ny * pushForce * 0.1;
+          }
+
+          const dxBall = ball.x - circle.x;
+          const dyBall = ball.y - circle.y;
+          const distBall = Math.sqrt(dxBall*dxBall + dyBall*dyBall);
+          const maxBallDist = config.circleRadius - config.ballRadius;
+
+          if (distBall > maxBallDist) {
+            const nx = dxBall / distBall;
+            const ny = dyBall / distBall;
+            const dot = ball.vx * nx + ball.vy * ny;
+            ball.vx -= 2 * dot * nx;
+            ball.vy -= 2 * dot * ny;
+            ball.vx *= config.damping;
+            ball.vy *= config.damping;
+            ball.x = circle.x + nx * maxBallDist;
+            ball.y = circle.y + ny * maxBallDist;
+          }
+
+          ball.x += ball.vx;
+          ball.y += ball.vy;
+        });
+      }
+
+      function drawCar() {
+        ctx.save();
+        ctx.translate(car.x, car.y);
+        ctx.rotate(car.angle);
+        ctx.fillStyle = '#2ecc71';
+        ctx.fillRect(-config.carWidth/2, -config.carHeight/2, config.carWidth, config.carHeight);
+        ctx.fillStyle = '#3498db';
+        ctx.fillRect(-config.carWidth/2 + 5, -config.carHeight/2 + 2, config.carWidth - 10, config.carHeight - 4);
+        ctx.fillStyle = '#2c3e50';
+        ctx.beginPath();
+        ctx.arc(-config.carWidth/3, -config.carHeight/2 - 3, 5, 0, Math.PI*2);
+        ctx.arc(config.carWidth/3, -config.carHeight/2 - 3, 5, 0, Math.PI*2);
+        ctx.arc(-config.carWidth/3, config.carHeight/2 + 3, 5, 0, Math.PI*2);
+        ctx.arc(config.carWidth/3, config.carHeight/2 + 3, 5, 0, Math.PI*2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      function draw() {
+        ctx.fillStyle = 'white';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.strokeStyle = 'black';
+        ctx.beginPath();
+        ctx.arc(circle.x, circle.y, config.circleRadius, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.fillStyle = 'red';
+        balls.forEach(ball => {
+          ctx.beginPath();
+          ctx.arc(ball.x, ball.y, config.ballRadius, 0, Math.PI * 2);
+          ctx.fill();
+        });
+
+        drawCar();
+      }
+
+      function gameLoop() {
+        updatePhysics();
+        draw();
+        requestAnimationFrame(gameLoop);
+      }
+
+      createBalls();
+      gameLoop();
+    })();
+  </script>
+</body>
+</html>
